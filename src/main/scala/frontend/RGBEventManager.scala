@@ -44,7 +44,7 @@ object RGBEventManager {
         queue.offer(i.string)
         Behaviors.same
       case m: MicroBatchedEvents =>
-        state.activeCollector.foreach(me => me ! SetCollector.BatchedCommand(m.list))
+        state.activeCollector.foreach(actor => actor ! SetCollector.BatchedCommand(m.list))
         Behaviors.same
       case r: RetirementRequest =>
         val newActor = context.spawn(SetCollector(), s"set_collector_${Instant.now().toEpochMilli}")
