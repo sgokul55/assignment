@@ -26,6 +26,9 @@ object SetCollector {
         log.debug("Blue message arrived {}", b)
         val updatedState = handleBlue(b, state)
         collectRGBSets(updatedState)
+      case lst: BatchedCommand =>
+        // TODO
+        Behaviors.same
       case s: GetState =>
         s.replyTo ! state
         Behaviors.same
@@ -70,12 +73,12 @@ object SetCollector {
     } else {
       val bIndex = state.blueHead
       val set = state.list(bIndex)
-      if (set.g.get.timestamp <= blue.timestamp ) {
+      if (set.g.get.timestamp <= blue.timestamp) {
         log.debug("Forming set with given green at {}", bIndex)
         val updatedList = state.list.updated(bIndex, set.copy(b = Some(blue)))
         state.copy(list = updatedList, blueHead = bIndex + 1, validSets = state.validSets + 1)
       } else {
-        log.warn("Dropping blue as no place...", blue)
+        log.warn("Dropping blue as no place. {}", blue)
         state
       }
     }
@@ -85,7 +88,8 @@ object SetCollector {
    * try to place the messages in right spot for given time.
    * if time elapses -> drop all out of order msgs.
    * R -> never be part of ooo msg, as it is first elm in the set.
-   * B -> f
+   * G -> wait arrival of R
+   * B -> wait for G to find its spot
    *
    * @param state
    */
@@ -106,7 +110,6 @@ object SetCollector {
       state
   }
 
-
   sealed trait Command
 
   final case class Red(name: String, timestamp: Long) extends Command
@@ -115,19 +118,11 @@ object SetCollector {
 
   final case class Blue(name: String, timestamp: Long) extends Command
 
+  final case class BatchedCommand(seq: Seq[Command]) extends Command
+
   final case class GetState(replyTo: ActorRef[State]) extends Command
 
-  case class RGB_Set(r: Red, g: Option[Green], b: Option[Blue]) {
-    def addGreen(green: Green): RGB_Set = {
-      if (canAddGreen(green)) copy(g = Some(green))
-      else this
-    }
-
-    def canAddGreen(green: Green): Boolean = {
-      g.isEmpty && r.timestamp < green.timestamp
-    }
-
-  }
+  case class RGB_Set(r: Red, g: Option[Green], b: Option[Blue])
 
   case class State(
                     list: Vector[RGB_Set], // all valid sets
@@ -136,17 +131,5 @@ object SetCollector {
                     blueHead: Int = 0,
                     validSets: Int = 0
                   )
-
-  // front end
-  // s1, s2, s3 ---> 3 sources are merge sorted by time stamp
-  // get the total pairs
-  // time query if possible
-
-  // backend - one active backend at a time
-  // receives batch of sorted events by manager
-  // fills red
-  // fills green and blue based on condition
-  // binary search
-
 
 }
