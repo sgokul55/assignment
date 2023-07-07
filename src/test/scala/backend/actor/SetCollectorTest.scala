@@ -36,6 +36,7 @@ class SetCollectorTest extends AnyWordSpec
         Vector(RGB_Set(Red("red", epoch), Some(Green("green", epoch + 1)), Some(Blue("blue", epoch + 2)))),
         Vector.empty,
         1,
+        1,
         1
       )
       actor ! SetCollector.Green("green", epoch + 1)
@@ -90,15 +91,34 @@ class SetCollectorTest extends AnyWordSpec
       assert(rgb.r.timestamp == rgb.b.get.timestamp - 2)
       assert(state.blueHead == 10_000)
       assert(state.greenHead == 10_000)
+      assert(state.validSets == 10_000)
     }
   }
 
   "Given out of order of R, G, B" must {
-    val actor = testKit.spawn(SetCollector(), "rgbCollector-2")
+    val actor = testKit.spawn(SetCollector(), "rgbCollector-3")
     val epoch = Instant.now().toEpochMilli
 
-    "For 10K R, place it internal state" in {
+    "For First G, B, R with valid timestamps, place it internal state" in {
+      val probe = testKit.createTestProbe[SetCollector.State]()
+      actor ! SetCollector.Green("Green", epoch + 1)
+      actor ! SetCollector.Blue("Blue", epoch + 2)
+      actor ! SetCollector.Red("Red", epoch)
+      actor ! SetCollector.GetState(probe.ref)
 
+      val state: SetCollector.State = probe.receiveMessage(3.seconds)
+      assert(state.validSets == 1)
+    }
+
+    "For First G, B, R with invalid timestamps, place it internal state" in {
+      val probe = testKit.createTestProbe[SetCollector.State]()
+      actor ! SetCollector.Green("Green", epoch)
+      actor ! SetCollector.Blue("Blue", epoch + 1)
+      actor ! SetCollector.Red("Red", epoch + 2)
+      actor ! SetCollector.GetState(probe.ref)
+
+      val state: SetCollector.State = probe.receiveMessage(3.seconds)
+      assert(state.validSets == 1)
     }
 
   }

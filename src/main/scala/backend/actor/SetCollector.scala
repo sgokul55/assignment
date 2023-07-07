@@ -36,51 +36,76 @@ object SetCollector {
     val s = state.copy(
       list = state.list :+ RGB_Set(red, None, None)
     )
-    if (state.outOfOrderMessages.nonEmpty) {
-      // fill the out of order msgs
+    if (s.outOfOrderMessages.nonEmpty) {
+      handleOutOfOrderMessages(s)
+    } else {
+      s
     }
-    s
+
   }
 
   private def handleGreen(green: Green, state: State)(implicit log: Logger): State = {
     // the red is already in sorted order!
-    val gIndex = state.greenHead
-    val set = state.list(gIndex)
-    if (set.r.timestamp <= green.timestamp) {
-      println(s"Forming set with given green at ${gIndex}")
-      val updatedList = state.list.updated(gIndex, set.copy(g = Some(green)))
-      state.copy(list = updatedList, greenHead = gIndex + 1)
+    if (state.list.isEmpty || state.list.size < state.greenHead + 1) {
+      // this message is out of order!
+      state.copy(outOfOrderMessages = state.outOfOrderMessages :+ green)
     } else {
-      println(s"Dropping green as no place")
-      state
+      val gIndex = state.greenHead
+      val set = state.list(gIndex)
+      if (set.r.timestamp <= green.timestamp) {
+        log.debug("Forming set with given green at {}", gIndex)
+        val updatedList = state.list.updated(gIndex, set.copy(g = Some(green)))
+        state.copy(list = updatedList, greenHead = gIndex + 1)
+      } else {
+        log.warn("Dropping green as no place. {}", green)
+        state
+      }
     }
   }
 
   private def handleBlue(blue: Blue, state: State)(implicit log: Logger): State = {
-    val bIndex = state.blueHead
-    val set = state.list(bIndex)
-    if (set.g.isEmpty) {
+    if (state.list.isEmpty || state.greenHead < state.blueHead + 1) {
       // the current blue is out of order!!
       state.copy(outOfOrderMessages = state.outOfOrderMessages :+ blue)
-    } else if (set.g.exists(g => g.timestamp <= blue.timestamp)) {
-      println(s"Forming set with given Blue at ${bIndex}")
-      val updatedList = state.list.updated(bIndex, set.copy(b = Some(blue)))
-      state.copy(list = updatedList, blueHead = bIndex + 1)
     } else {
-      println(s"Dropping blue as no place")
-      state
-    }
-  }
-
-  private def handleOutOfOrderMessages(vector: Vector[Command]) = {
-    val a: Seq[Command] = vector.filter { g =>
-      g match {
-        case g: Green =>
-          true
-        case _ => false
+      val bIndex = state.blueHead
+      val set = state.list(bIndex)
+      if (set.g.get.timestamp <= blue.timestamp ) {
+        log.debug("Forming set with given green at {}", bIndex)
+        val updatedList = state.list.updated(bIndex, set.copy(b = Some(blue)))
+        state.copy(list = updatedList, blueHead = bIndex + 1, validSets = state.validSets + 1)
+      } else {
+        log.warn("Dropping blue as no place...", blue)
+        state
       }
     }
   }
+
+  /**
+   * try to place the messages in right spot for given time.
+   * if time elapses -> drop all out of order msgs.
+   * R -> never be part of ooo msg, as it is first elm in the set.
+   * B -> f
+   *
+   * @param state
+   */
+  private def handleOutOfOrderMessages(state: State)(implicit logger: Logger): State = {
+    if (state.outOfOrderMessages.nonEmpty) {
+      val ooom = state.outOfOrderMessages
+      var s = state
+      ooom.foreach {
+        case g: Green =>
+          logger.debug("Handling out of order - Green msg - {}", g)
+          s = handleGreen(g, s)
+        case b: Blue =>
+          logger.debug("Handling out of order - Blue msg - {}", b)
+          s = handleBlue(b, s)
+      }
+      s
+    } else
+      state
+  }
+
 
   sealed trait Command
 
@@ -108,7 +133,8 @@ object SetCollector {
                     list: Vector[RGB_Set], // all valid sets
                     outOfOrderMessages: Vector[Command], // non matchable -> G, B
                     greenHead: Int = 0,
-                    blueHead: Int = 0
+                    blueHead: Int = 0,
+                    validSets: Int = 0
                   )
 
   // front end
