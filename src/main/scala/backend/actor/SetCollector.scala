@@ -62,30 +62,29 @@ object SetCollector {
     }
   }
 
-  /**
-   * try to place the messages in right spot for given time.
-   * if time elapses -> drop all out of order msgs.
-   * R -> never be part of ooo msg, as it is first elm in the set.
-   * G -> wait arrival of R
-   * B -> wait for G to find its spot
-   *
-   * @param state
-   */
-  private def handleOutOfOrderMessages(state: State)(implicit logger: Logger): State = {
-    if (state.outOfOrderMessages.nonEmpty) {
-      val ooom = state.outOfOrderMessages
-      var s = state
-      ooom.foreach {
-        case g: Green =>
-          logger.debug("Handling out of order - Green msg - {}", g)
-          s = handleGreen(g, s, false)
-        case b: Blue =>
-          logger.debug("Handling out of order - Blue msg - {}", b)
-          s = handleBlue(b, s, false)
+  private def handleGreen(green: Green, state: State, accumulateOOOM: Boolean = true)(implicit log: Logger): State = {
+    // the red is already in sorted order!
+    if (state.list.isEmpty || state.list.size < state.greenHead + 1) {
+      log.debug("the current green is out of order")
+      if (accumulateOOOM) state.copy(outOfOrderMessages = state.outOfOrderMessages :+ green)
+      else state
+    } else {
+      val gIndex = state.greenHead
+      val set = state.list(gIndex)
+      if (set.r.timestamp <= green.timestamp) {
+        log.debug("Forming set with given green at {}", gIndex)
+        val updatedList = state.list.updated(gIndex, set.copy(g = Some(green)))
+        if (accumulateOOOM)
+          state.copy(list = updatedList, greenHead = gIndex + 1)
+        else {
+          val updated = removeFirst[Command](state.outOfOrderMessages, green)
+          state.copy(list = updatedList, greenHead = gIndex + 1, outOfOrderMessages = updated)
+        }
+      } else {
+        log.warn("Dropping green as no place. {}", green)
+        state
       }
-      s
-    } else
-      state
+    }
   }
 
   private def handleBlue(blue: Blue, state: State, accumulateOOOM: Boolean = true)(implicit log: Logger): State = {
@@ -111,29 +110,29 @@ object SetCollector {
     }
   }
 
-  private def handleGreen(green: Green, state: State, accumulateOOOM: Boolean = true)(implicit log: Logger): State = {
-    // the red is already in sorted order!
-    if (state.list.isEmpty || state.list.size < state.greenHead + 1) {
-      log.debug("the current green is out of order")
-      if (accumulateOOOM) state.copy(outOfOrderMessages = state.outOfOrderMessages :+ green)
-      else state
-    } else {
-      val gIndex = state.greenHead
-      val set = state.list(gIndex)
-      if (set.r.timestamp <= green.timestamp) {
-        log.debug("Forming set with given green at {}", gIndex)
-        val updatedList = state.list.updated(gIndex, set.copy(g = Some(green)))
-        if (accumulateOOOM)
-          state.copy(list = updatedList, greenHead = gIndex + 1)
-        else {
-          val updated = removeFirst[Command](state.outOfOrderMessages, green)
-          state.copy(list = updatedList, greenHead = gIndex + 1, outOfOrderMessages = updated)
-        }
-      } else {
-        log.warn("Dropping green as no place. {}", green)
-        state
+  /**
+   * try to place the messages in right spot for given time.
+   * if time elapses -> drop all out of order msgs.
+   * R -> never be part of ooo msg, as it is first elm in the set.
+   * G -> wait arrival of R
+   * B -> wait for G to find its spot
+   *
+   */
+  private def handleOutOfOrderMessages(state: State)(implicit logger: Logger): State = {
+    if (state.outOfOrderMessages.nonEmpty) {
+      val ooom = state.outOfOrderMessages
+      var s = state
+      ooom.foreach {
+        case g: Green =>
+          logger.debug("Handling out of order - Green msg - {}", g)
+          s = handleGreen(g, s, false)
+        case b: Blue =>
+          logger.debug("Handling out of order - Blue msg - {}", b)
+          s = handleBlue(b, s, false)
       }
-    }
+      s
+    } else
+      state
   }
 
   private def removeFirst[T](xs: Vector[T], x: T) = {
