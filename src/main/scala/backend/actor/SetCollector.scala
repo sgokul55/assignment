@@ -9,6 +9,9 @@ import java.time.Instant
 
 object SetCollector {
 
+  // for query - + or - 50 millisecond accuracy
+  val accuracyLevel = 50
+
   def apply(): Behavior[Command] = Behaviors.setup { context =>
     implicit val log: Logger = context.log
     val maxRecords: Int = context.system.settings.config.getConfig("conviva").getInt("max-records")
@@ -34,18 +37,18 @@ object SetCollector {
         val batch: Seq[Command] = lst.seq
         val updatedState = handleBatchRequest(batch, state)
         val outOfOrderHandledState = handleOutOfOrderMessages(updatedState)
-        if (updatedState.validSets == state.maxRecords) {
+        if (outOfOrderHandledState.validSets >= outOfOrderHandledState.maxRecords) {
           // there can be some more in-flight messages.
           log.warn("I am retiring from set collection. Total processed sets {} ", state.validSets)
-          val startTime = updatedState.list.head.r.timestamp
-          val endTime = updatedState.list.last.r.timestamp
+          val startTime = outOfOrderHandledState.list.head.r.timestamp
+          val endTime = outOfOrderHandledState.list.last.r.timestamp
           lst.replyTo ! RGBEventManager
             .RetirementRequest(
               Instant.ofEpochMilli(startTime),
               Instant.ofEpochMilli(endTime),
               context.self
             )
-          val finalState = updatedState.copy(outOfOrderMessages = Vector.empty)
+          val finalState = outOfOrderHandledState.copy(outOfOrderMessages = Vector.empty)
           queryOnlyMode(finalState)
         } else {
           collectRGBSets(outOfOrderHandledState)
@@ -53,6 +56,37 @@ object SetCollector {
       case s: GetState =>
         s.replyTo ! state
         Behaviors.same
+      case q: Query =>
+        // given start and end time, return all the RGB_Sets
+        // sIndex cant be -1 as manager decided this
+        val sIndex = binraySearch(state.list, q.start, 0, state.list.size)
+        // it can be -1, the remaining, can be spill over in next actor
+        val eIndex = binraySearch(state.list, q.end, 0, state.list.size)
+        if (sIndex != -1) {
+          val qResult: Seq[RGB_Set] = if (eIndex == -1) {
+            state.list.takeRight(state.list.size - sIndex)
+          } else {
+            state.list.take(state.list.size - eIndex)
+          }
+          q.replyTo ! qResult.toList
+        } else {
+          q.replyTo ! List.empty[RGB_Set]
+        }
+        Behaviors.same
+    }
+  }
+
+  private def binraySearch(list: Seq[RGB_Set], key: Long, l: Int, r: Int): Int = {
+    if (l >= r) -1
+    else {
+      val mid = l + (r - l) / 2
+      if (list(mid).r.timestamp == key || Math.abs(list(mid).r.timestamp - key) <= accuracyLevel)
+        mid
+      else if (list(mid).r.timestamp < key) {
+        binraySearch(list, key, mid + 1, r)
+      } else {
+        binraySearch(list, key, l, mid)
+      }
     }
   }
 
@@ -183,6 +217,8 @@ object SetCollector {
   final case class BatchedCommand(seq: Seq[Command], replyTo: ActorRef[RGBEventManager.ManagerCommand]) extends Command
 
   final case class GetState(replyTo: ActorRef[State]) extends Command
+
+  final case class Query(start: Long, end: Long, replyTo: ActorRef[List[RGB_Set]]) extends Command
 
   case class RGB_Set(r: Red, g: Option[Green], b: Option[Blue])
 

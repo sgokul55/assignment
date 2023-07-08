@@ -20,7 +20,6 @@ class SetCollectorTest extends AnyWordSpec
           akka.log-config-on-start = on
     """
   ).withFallback(ConfigFactory.load())
-
   val testKit = ActorTestKit("test", config)
 
   "Given R, G, B messages" must {
@@ -168,6 +167,9 @@ class SetCollectorTest extends AnyWordSpec
       assert(result.validSets == 100)
       assert(result.outOfOrderMessages.isEmpty)
     }
+    // query
+
+
   }
 
 
