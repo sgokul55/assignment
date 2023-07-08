@@ -44,7 +44,7 @@ object RGBEventManager {
         queue.offer(i.string)
         Behaviors.same
       case m: MicroBatchedEvents =>
-        state.activeCollector.foreach(actor => actor ! SetCollector.BatchedCommand(m.list))
+        state.activeCollector.foreach(actor => actor ! SetCollector.BatchedCommand(m.list, context.self))
         Behaviors.same
       case r: RetirementRequest =>
         val newActor = context.spawn(SetCollector(), s"set_collector_${Instant.now().toEpochMilli}")
@@ -53,6 +53,9 @@ object RGBEventManager {
           agedCollectors = state.agedCollectors :+ (r.startTime, r.endTime, r.replyTo)
         )
         activate(s, queue)
+      case r: ReturnUnprocessed =>
+        state.activeCollector.foreach(actor => actor ! SetCollector.BatchedCommand(r.list, context.self))
+        Behaviors.same
     }
   }
 
@@ -94,6 +97,7 @@ object RGBEventManager {
 
   case class RetirementRequest(startTime: Instant, endTime: Instant, replyTo: ActorRef[SetCollector.Command]) extends ManagerCommand
 
+  case class ReturnUnprocessed(list: Seq[SetCollector.Command]) extends ManagerCommand
 
   case class State(
                     activeCollector: Option[ActorRef[SetCollector.Command]],

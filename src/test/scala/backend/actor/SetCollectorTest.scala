@@ -1,6 +1,8 @@
 package backend.actor
 
 import akka.actor.testkit.typed.scaladsl.ActorTestKit
+import com.typesafe.config.ConfigFactory
+import frontend.RGBEventManager
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
@@ -12,8 +14,14 @@ import scala.util.Random
 class SetCollectorTest extends AnyWordSpec
   with BeforeAndAfterAll
   with Matchers {
+  val config = ConfigFactory.parseString(
+    """
+          conviva.max-records = 100000
+          akka.log-config-on-start = on
+    """
+  ).withFallback(ConfigFactory.load())
 
-  val testKit = ActorTestKit()
+  val testKit = ActorTestKit("test", config)
 
   "Given R, G, B messages" must {
     val actor = testKit.spawn(SetCollector(), "rgbCollector-1")
@@ -23,7 +31,7 @@ class SetCollectorTest extends AnyWordSpec
       //val actor = testKit.spawn(SetCollector(), "rgbCollector-1")
       val probe = testKit.createTestProbe[SetCollector.State]()
       import backend.actor.SetCollector._
-      val expectedState = State(Vector(RGB_Set(Red("red", epoch), None, None)), Vector.empty, 0, 0)
+      val expectedState = State(Vector(RGB_Set(Red("red", epoch), None, None)), Vector.empty, 0, 0, 0, 100000)
       actor ! SetCollector.Red("red", epoch)
       actor ! SetCollector.GetState(probe.ref)
       probe.expectMessage(expectedState)
@@ -37,7 +45,8 @@ class SetCollectorTest extends AnyWordSpec
         Vector.empty,
         1,
         1,
-        1
+        1,
+        100000
       )
       actor ! SetCollector.Green("green", epoch + 1)
       actor ! SetCollector.Blue("blue", epoch + 2)
@@ -126,12 +135,13 @@ class SetCollectorTest extends AnyWordSpec
   "Given R, G, B batch messages" must {
     val actor = testKit.spawn(SetCollector(), "rgbCollector-4")
     val epoch = Instant.now().toEpochMilli
+    val reply = testKit.createTestProbe[RGBEventManager.ManagerCommand]()
 
     "For single R batch message, place it internal state" in {
       val probe = testKit.createTestProbe[SetCollector.State]()
       import backend.actor.SetCollector._
       val redBatch = (1 to 100).map { i => Red(s"red-$i", epoch + i) }
-      actor ! SetCollector.BatchedCommand(redBatch)
+      actor ! SetCollector.BatchedCommand(redBatch, reply.ref)
       actor ! SetCollector.GetState(probe.ref)
       val result: State = probe.receiveMessage(3.seconds)
       assert(result.list.size == 100)
@@ -141,7 +151,7 @@ class SetCollectorTest extends AnyWordSpec
       val probe = testKit.createTestProbe[SetCollector.State]()
       import backend.actor.SetCollector._
       val blueBatch = (1 to 100).map { i => Blue(s"blue-$i", epoch + i + 2) }
-      actor ! SetCollector.BatchedCommand(blueBatch)
+      actor ! SetCollector.BatchedCommand(blueBatch, reply.ref)
       actor ! SetCollector.GetState(probe.ref)
       val result: State = probe.receiveMessage(3.seconds)
       assert(result.list.size == 100)
@@ -151,7 +161,7 @@ class SetCollectorTest extends AnyWordSpec
       val probe = testKit.createTestProbe[SetCollector.State]()
       import backend.actor.SetCollector._
       val greenBatch = (1 to 100).map { i => Green(s"green-$i", epoch + i + 1) }
-      actor ! SetCollector.BatchedCommand(greenBatch)
+      actor ! SetCollector.BatchedCommand(greenBatch, reply.ref)
       actor ! SetCollector.GetState(probe.ref)
       val result: State = probe.receiveMessage(3.seconds)
       assert(result.list.size == 100)

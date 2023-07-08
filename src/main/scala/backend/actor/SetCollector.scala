@@ -1,18 +1,22 @@
 package backend.actor
 
-import akka.actor.typed.scaladsl.Behaviors
+import akka.actor.typed.scaladsl.{ActorContext, Behaviors}
 import akka.actor.typed.{ActorRef, Behavior}
+import frontend.RGBEventManager
 import org.slf4j.Logger
+
+import java.time.Instant
 
 object SetCollector {
 
   def apply(): Behavior[Command] = Behaviors.setup { context =>
     implicit val log: Logger = context.log
-    val initialState = State(Vector.empty[RGB_Set], Vector.empty, 0, 0)
-    collectRGBSets(initialState)
+    val maxRecords: Int = context.system.settings.config.getConfig("conviva").getInt("max-records")
+    val initialState = State(Vector.empty[RGB_Set], Vector.empty, 0, 0, 0, maxRecords)
+    collectRGBSets(initialState)(log, context)
   }
 
-  private def collectRGBSets(state: State)(implicit log: Logger): Behaviors.Receive[Command] = {
+  private def collectRGBSets(state: State)(implicit log: Logger, context: ActorContext[Command]): Behaviors.Receive[Command] = {
     Behaviors.receiveMessage {
       case r: Red =>
         log.debug("Red message arrived {}", r)
@@ -27,12 +31,38 @@ object SetCollector {
         val updatedState = handleBlue(b, state)
         collectRGBSets(updatedState)
       case lst: BatchedCommand =>
-        val a: Seq[Command] = lst.seq
-        val updatedState = handleBatchRequest(a, state)
+        val batch: Seq[Command] = lst.seq
+        val updatedState = handleBatchRequest(batch, state)
         val outOfOrderHandledState = handleOutOfOrderMessages(updatedState)
-        collectRGBSets(outOfOrderHandledState)
+        if (updatedState.validSets == state.maxRecords) {
+          // there can be some more in-flight messages.
+          log.warn("I am retiring from set collection. Total processed sets {} ", state.validSets)
+          val startTime = updatedState.list.head.r.timestamp
+          val endTime = updatedState.list.last.r.timestamp
+          lst.replyTo ! RGBEventManager
+            .RetirementRequest(
+              Instant.ofEpochMilli(startTime),
+              Instant.ofEpochMilli(endTime),
+              context.self
+            )
+          val finalState = updatedState.copy(outOfOrderMessages = Vector.empty)
+          queryOnlyMode(finalState)
+        } else {
+          collectRGBSets(outOfOrderHandledState)
+        }
       case s: GetState =>
         s.replyTo ! state
+        Behaviors.same
+    }
+  }
+
+  private def queryOnlyMode(state: State): Behaviors.Receive[Command] = {
+    Behaviors.receiveMessage {
+      case s: GetState =>
+        s.replyTo ! state
+        Behaviors.same
+      case lst: BatchedCommand =>
+        lst.replyTo ! RGBEventManager.ReturnUnprocessed(lst.seq)
         Behaviors.same
     }
   }
@@ -82,7 +112,8 @@ object SetCollector {
         }
       } else {
         log.warn("Dropping green as no place. {}", green)
-        state
+        val updated = removeFirst[Command](state.outOfOrderMessages, green)
+        state.copy(outOfOrderMessages = updated)
       }
     }
   }
@@ -105,7 +136,8 @@ object SetCollector {
         }
       } else {
         log.warn("Dropping blue as no place. {}", blue)
-        state
+        val updated = removeFirst[Command](state.outOfOrderMessages, blue)
+        state.copy(outOfOrderMessages = updated)
       }
     }
   }
@@ -148,7 +180,7 @@ object SetCollector {
 
   final case class Blue(name: String, timestamp: Long) extends Command
 
-  final case class BatchedCommand(seq: Seq[Command]) extends Command
+  final case class BatchedCommand(seq: Seq[Command], replyTo: ActorRef[RGBEventManager.ManagerCommand]) extends Command
 
   final case class GetState(replyTo: ActorRef[State]) extends Command
 
@@ -159,7 +191,8 @@ object SetCollector {
                     outOfOrderMessages: Vector[Command], // non matchable -> G, B
                     greenHead: Int = 0,
                     blueHead: Int = 0,
-                    validSets: Int = 0
+                    validSets: Int = 0,
+                    maxRecords: Int
                   )
 
 }
