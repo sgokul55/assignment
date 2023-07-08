@@ -1,4 +1,4 @@
-package backend.actor
+package backend
 
 import akka.actor.typed.scaladsl.{ActorContext, Behaviors}
 import akka.actor.typed.{ActorRef, Behavior}
@@ -39,7 +39,7 @@ object SetCollector {
         val outOfOrderHandledState = handleOutOfOrderMessages(updatedState)
         if (outOfOrderHandledState.validSets >= outOfOrderHandledState.maxRecords) {
           // there can be some more in-flight messages.
-          log.warn("I am retiring from set collection. Total processed sets {} ", state.validSets)
+          log.warn("I am retiring from set collection. Total processed sets {} ", outOfOrderHandledState.validSets)
           val startTime = outOfOrderHandledState.list.head.r.timestamp
           val endTime = outOfOrderHandledState.list.last.r.timestamp
           lst.replyTo ! RGBEventManager
@@ -66,7 +66,8 @@ object SetCollector {
           val qResult: Seq[RGB_Set] = if (eIndex == -1) {
             state.list.takeRight(state.list.size - sIndex)
           } else {
-            state.list.take(state.list.size - eIndex)
+            val temp = state.list.take(eIndex)
+            temp.takeRight(temp.size - sIndex)
           }
           q.replyTo ! qResult.toList
         } else {
@@ -97,6 +98,23 @@ object SetCollector {
         Behaviors.same
       case lst: BatchedCommand =>
         lst.replyTo ! RGBEventManager.ReturnUnprocessed(lst.seq)
+        Behaviors.same
+      case q: Query =>
+        // given start and end time, return all the RGB_Sets
+        // sIndex cant be -1 as manager decided this
+        val sIndex = binraySearch(state.list, q.start, 0, state.list.size)
+        // it can be -1, the remaining, can be spill over in next actor
+        val eIndex = binraySearch(state.list, q.end, 0, state.list.size)
+        if (sIndex != -1) {
+          val qResult: Seq[RGB_Set] = if (eIndex == -1) {
+            state.list.takeRight(state.list.size - sIndex)
+          } else {
+            state.list.take(state.list.size - eIndex)
+          }
+          q.replyTo ! qResult.toList
+        } else {
+          q.replyTo ! List.empty[RGB_Set]
+        }
         Behaviors.same
     }
   }

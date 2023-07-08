@@ -1,8 +1,9 @@
-package backend.actor
+package backend
 
 import akka.actor.testkit.typed.scaladsl.ActorTestKit
 import com.typesafe.config.ConfigFactory
 import frontend.RGBEventManager
+import backend.SetCollector._
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
@@ -26,7 +27,6 @@ class SetCollectorRetireTest extends AnyWordSpec
     val actor = testKit.spawn(SetCollector(), "rgbCollector-4")
     "Expect retirement request upon max record reached" in {
       val epoch = Instant.now().toEpochMilli
-      import backend.actor.SetCollector._
       val redBatch = (1 to 11).map { i => Red(s"red-$i", epoch + i) }
       val blueBatch = (1 to 11).map { i => Blue(s"blue-$i", epoch + i + 2) }
       val greenBatch = (1 to 11).map { i => Green(s"green-$i", epoch + i + 1) }
@@ -38,7 +38,6 @@ class SetCollectorRetireTest extends AnyWordSpec
     }
     "Return the events given after retirement" in {
       val epoch = Instant.now().toEpochMilli
-      import backend.actor.SetCollector._
       val redBatch = (1 to 11).map { i => Red(s"red-$i", epoch + i) }
       actor ! SetCollector.BatchedCommand(redBatch, probe.ref)
       probe.expectMessage(RGBEventManager.ReturnUnprocessed(redBatch))

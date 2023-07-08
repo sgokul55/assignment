@@ -1,7 +1,7 @@
 package frontend
 
 import akka.actor.testkit.typed.scaladsl.ActorTestKit
-import backend.actor.SetCollector
+import backend.SetCollector
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec

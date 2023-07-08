@@ -4,7 +4,7 @@ import akka.actor.typed.scaladsl.{ActorContext, Behaviors}
 import akka.actor.typed.{ActorRef, ActorSystem, Behavior}
 import akka.stream.OverflowStrategy
 import akka.stream.scaladsl.{Keep, Sink, Source, SourceQueueWithComplete}
-import backend.actor.SetCollector
+import backend.SetCollector
 import org.slf4j.Logger
 
 import java.time.Instant
