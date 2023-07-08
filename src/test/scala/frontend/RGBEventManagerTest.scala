@@ -48,4 +48,11 @@ class RGBEventManagerTest extends AnyWordSpec
 
   }
 
+  "Given Retirement Command" must {
+    "Activate new collector and maintain old rgb set collectors" in {
+
+    }
+
+  }
+
 }

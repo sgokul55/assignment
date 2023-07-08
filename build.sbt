@@ -6,7 +6,7 @@ val AkkaVersion = "2.6.20"
 lazy val root = (project in file("."))
   .settings(
     name := "assignment",
-
+    Test / parallelExecution := false,
     libraryDependencies ++= Seq(
       "com.typesafe.akka" %% "akka-actor-typed" % AkkaVersion,
       "com.typesafe.akka" %% "akka-slf4j" % AkkaVersion,

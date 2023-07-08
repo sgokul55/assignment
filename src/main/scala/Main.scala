@@ -3,3 +3,16 @@ object Main {
     println("Hello world!")
   }
 }
+
+/*
+* Pending :
+*
+* Ageing implementation
+* Binary search for getting data between time range
+* total sets aggregation
+*
+*
+* with Distributed System...
+*
+*
+* */

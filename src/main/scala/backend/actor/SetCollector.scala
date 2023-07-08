@@ -44,7 +44,6 @@ object SetCollector {
     } else {
       s
     }
-
   }
 
   private def handleGreen(green: Green, state: State)(implicit log: Logger): State = {
