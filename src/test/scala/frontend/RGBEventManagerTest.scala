@@ -19,7 +19,7 @@ class RGBEventManagerTest extends AnyWordSpec
     val epoch = Instant.now().toEpochMilli
     "for multiple same kind of raw events, forward batch to SetCollector" in {
       val probe = testKit.createTestProbe[SetCollector.Command]()
-      val initState = RGBEventManager.State(Some(probe.ref), Vector.empty)
+      val initState = RGBEventManager.State(Some(probe.ref), Vector.empty, 1)
       val manager = testKit.spawn(RGBEventManager(Some(initState)), "manager-1")
       (1 to 100).foreach { i =>
         manager ! RGBEventManager.InputEvent(s"R_${epoch + i}")
@@ -29,7 +29,7 @@ class RGBEventManagerTest extends AnyWordSpec
     }
     "for multiple different kind of raw events, forward grouped by event type batch to SetCollector" in {
       val probe = testKit.createTestProbe[SetCollector.Command]()
-      val initState = RGBEventManager.State(Some(probe.ref), Vector.empty)
+      val initState = RGBEventManager.State(Some(probe.ref), Vector.empty, 1)
       val manager = testKit.spawn(RGBEventManager(Some(initState)), "manager-2")
       (1 to 100).foreach { i =>
         if (i % 3 == 0) {

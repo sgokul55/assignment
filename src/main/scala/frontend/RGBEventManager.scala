@@ -29,8 +29,9 @@ object RGBEventManager {
     implicit val log: Logger = context.log
     // for helping unit test
     val initialState = if (state.isEmpty) {
+      val maxCollectors = context.system.settings.config.getInt("conviva.max-nr-of-aged-collectors")
       val initialActor = context.spawn(SetCollector.apply(), s"set_collector_${Instant.now().toEpochMilli}")
-      State(Some(initialActor), Vector.empty)
+      State(Some(initialActor), Vector.empty, maxCollectors)
     } else
       state.get
     val q = queue(context.self)(context.system, context.executionContext)
@@ -52,13 +53,24 @@ object RGBEventManager {
           activeCollector = Some(newActor),
           agedCollectors = state.agedCollectors :+ (r.startTime, r.endTime, r.replyTo)
         )
-        activate(s, queue)
+        val finalState = if (state.maxNoOfAgedCollector < s.agedCollectors.size) {
+          // stop the age old actor!
+          context.stop(state.agedCollectors(0)._3)
+          state.copy(
+            agedCollectors = state.agedCollectors.takeRight(1)
+          )
+        } else {
+          s
+        }
+        activate(finalState, queue)
       case r: ReturnUnprocessed =>
         state.activeCollector.foreach(actor => actor ! SetCollector.BatchedCommand(r.list, context.self))
         Behaviors.same
+      case g: GetManagerState =>
+        g.replyTo ! state
+        Behaviors.same
     }
   }
-
 
   private def queue(actorRef: ActorRef[ManagerCommand])(implicit system: ActorSystem[_], ec: ExecutionContext): SourceQueueWithComplete[String] = {
     Source.queue[String](QueueSize, OverflowStrategy.dropNew)
@@ -99,9 +111,12 @@ object RGBEventManager {
 
   case class ReturnUnprocessed(list: Seq[SetCollector.Command]) extends ManagerCommand
 
+  case class GetManagerState(replyTo: ActorRef[State]) extends ManagerCommand
+
   case class State(
                     activeCollector: Option[ActorRef[SetCollector.Command]],
-                    agedCollectors: Vector[(Instant, Instant, ActorRef[SetCollector.Command])]
+                    agedCollectors: Vector[(Instant, Instant, ActorRef[SetCollector.Command])],
+                    maxNoOfAgedCollector: Int
                   )
 
 

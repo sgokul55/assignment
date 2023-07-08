@@ -9,7 +9,7 @@ object Main {
 *
 * Ageing implementation - Done
 * Binary search for getting data between time range - Done
-* total sets aggregation
+* total sets aggregation - done
 *
 * manager -> how many old collectors to keep!!!
 *

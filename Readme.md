@@ -4,6 +4,8 @@
 
 # Solution Proposed
 
+![solution.png](..%2F..%2F..%2F..%2FDownloads%2Fsolution.png)
+
 ## FrontEnd:
 
 #### Responsible for
@@ -11,16 +13,43 @@
 - orders all message by time
 - micro-batch it by Category (RGB)
 - forward it to backend for set preparation
-
-#### Example
-Kafka partitions s1, s2, s3 (produces R, G, B) ---> 3 sources are merge sorted by time stamp
-get the total pairs
-time query if possible
+- receives RetirementRequest from current serving SetCollector
+- Firstly the SetCollector is moved to old collectors (data still available in memory)
+- Creates new SetCollector, now it is responsible for forming sets
+- RGB manager prunes aged actor based on configuration. ex: keep 10 aged actor. if 11th added to agedList. remove 1st.
+- so it is based on user to decide how many data to keep.
+- across actor query coordination. Ex: given start, end time could be spanned across multiple actors. it takes care of 
+- coordinating and producing the results. 
 
 ## Backend 
 #### - one active backend at a time
 
-receives batch of sorted events by manager
-fills red
-fills green and blue based on condition
-binary search
+- receives batch of sorted events by manager
+- fills red 
+- if any out of order events (G, B -> before R or B before G), buffers it and forms sets later the required event arrived.
+- fills green and blue based on condition
+- for given time range - does binary search and returns the result.
+- if max no of sets served, requests for retirement
+
+## Lets get the hands dirty:
+
+To run the unit testing
+
+```sh
+sbt test
+```
+To run the app
+
+```sh
+docker compose up -d
+```
+
+To run the app in k8s
+
+```sh
+docker compose up -d
+```
+
+## Future Work
+
+#### - Clustered approach to scale out the backend. so we can accommodate more in-memory data across multiple machines. 
