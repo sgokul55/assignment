@@ -4,7 +4,7 @@
 
 # Solution Proposed
 
-![solution.png](..%2F..%2F..%2F..%2FDownloads%2Fsolution.png)
+![solution.png](solution.png)
 
 ## FrontEnd:
 
