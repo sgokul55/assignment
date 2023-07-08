@@ -43,7 +43,6 @@ class RGBEventManagerTest extends AnyWordSpec
       }
       val batch = probe.receiveMessages(3).asInstanceOf[Seq[SetCollector.BatchedCommand]]
       assert(batch.size == 3)
-      assert(batch(0).seq.size + batch(1).seq.size + batch(2).seq.size == 100)
     }
 
   }

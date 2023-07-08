@@ -123,6 +123,43 @@ class SetCollectorTest extends AnyWordSpec
 
   }
 
+  "Given R, G, B batch messages" must {
+    val actor = testKit.spawn(SetCollector(), "rgbCollector-4")
+    val epoch = Instant.now().toEpochMilli
+
+    "For single R batch message, place it internal state" in {
+      val probe = testKit.createTestProbe[SetCollector.State]()
+      import backend.actor.SetCollector._
+      val redBatch = (1 to 100).map { i => Red(s"red-$i", epoch + i) }
+      actor ! SetCollector.BatchedCommand(redBatch)
+      actor ! SetCollector.GetState(probe.ref)
+      val result: State = probe.receiveMessage(3.seconds)
+      assert(result.list.size == 100)
+    }
+
+    "For single Blue batch message, place it internal state" in {
+      val probe = testKit.createTestProbe[SetCollector.State]()
+      import backend.actor.SetCollector._
+      val blueBatch = (1 to 100).map { i => Blue(s"blue-$i", epoch + i + 2) }
+      actor ! SetCollector.BatchedCommand(blueBatch)
+      actor ! SetCollector.GetState(probe.ref)
+      val result: State = probe.receiveMessage(3.seconds)
+      assert(result.list.size == 100)
+      assert(result.outOfOrderMessages.size == 100)
+    }
+    "For single Green batch message, place it internal state" in {
+      val probe = testKit.createTestProbe[SetCollector.State]()
+      import backend.actor.SetCollector._
+      val greenBatch = (1 to 100).map { i => Green(s"green-$i", epoch + i + 1) }
+      actor ! SetCollector.BatchedCommand(greenBatch)
+      actor ! SetCollector.GetState(probe.ref)
+      val result: State = probe.receiveMessage(3.seconds)
+      assert(result.list.size == 100)
+      assert(result.validSets == 100)
+      assert(result.outOfOrderMessages.isEmpty)
+    }
+  }
+
 
   override def afterAll(): Unit = testKit.shutdownTestKit()
 

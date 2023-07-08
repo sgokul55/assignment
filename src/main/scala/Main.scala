@@ -11,6 +11,8 @@ object Main {
 * Binary search for getting data between time range
 * total sets aggregation
 *
+* manager -> how many old collectors to keep!!!
+*
 *
 * with Distributed System...
 *
