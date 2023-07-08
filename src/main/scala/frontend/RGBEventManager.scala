@@ -10,6 +10,7 @@ import org.slf4j.Logger
 import java.time.Instant
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.{ExecutionContext, Future}
+import scala.util.Random
 
 /**
  *
@@ -48,7 +49,7 @@ object RGBEventManager {
         state.activeCollector.foreach(actor => actor ! SetCollector.BatchedCommand(m.list, context.self))
         Behaviors.same
       case r: RetirementRequest =>
-        val newActor = context.spawn(SetCollector(), s"set_collector_${Instant.now().toEpochMilli}")
+        val newActor = context.spawn(SetCollector(), s"set_collector_${Instant.now().toEpochMilli}_${Random.nextInt()}")
         val s = state.copy(
           activeCollector = Some(newActor),
           agedCollectors = state.agedCollectors :+ (r.startTime, r.endTime, r.replyTo)
@@ -56,8 +57,8 @@ object RGBEventManager {
         val finalState = if (state.maxNoOfAgedCollector < s.agedCollectors.size) {
           // stop the age old actor!
           context.stop(state.agedCollectors(0)._3)
-          state.copy(
-            agedCollectors = state.agedCollectors.takeRight(1)
+          s.copy(
+            agedCollectors = s.agedCollectors.takeRight(1)
           )
         } else {
           s

@@ -17,7 +17,6 @@ class SetCollectorRetireTest extends AnyWordSpec
   val config = ConfigFactory.parseString(
     """
           conviva.max-records = 10
-          akka.log-config-on-start = on
     """
   ).withFallback(ConfigFactory.load())
   val testKit = ActorTestKit("test", config)
