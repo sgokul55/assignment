@@ -44,11 +44,9 @@ To run the app
 docker compose up -d
 ```
 
-To run the app in k8s
+## Benchmarks
 
-```sh
-docker compose up -d
-```
+following are some benchmarks!!
 
 ## Future Work
 

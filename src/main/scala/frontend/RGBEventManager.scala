@@ -5,6 +5,7 @@ import akka.actor.typed.{ActorRef, ActorSystem, Behavior}
 import akka.stream.OverflowStrategy
 import akka.stream.scaladsl.{Keep, Sink, Source, SourceQueueWithComplete}
 import backend.SetCollector
+import backend.SetCollector.RGB_Set
 import org.slf4j.Logger
 
 import java.time.Instant
@@ -70,6 +71,12 @@ object RGBEventManager {
       case g: GetManagerState =>
         g.replyTo ! state
         Behaviors.same
+      case q: Query =>
+        // sent the query matching old and current active actors.
+        val filtered = state.agedCollectors.filter(a => Instant.ofEpochMilli(q.start).isBefore(a._2))
+        filtered.foreach(a => a._3 ! SetCollector.Query(q.start, q.end, q.replyTo))
+        state.activeCollector.foreach(a => a ! SetCollector.Query(q.start, q.end, q.replyTo))
+        Behaviors.same
     }
   }
 
@@ -113,6 +120,8 @@ object RGBEventManager {
   case class ReturnUnprocessed(list: Seq[SetCollector.Command]) extends ManagerCommand
 
   case class GetManagerState(replyTo: ActorRef[State]) extends ManagerCommand
+
+  final case class Query(start: Long, end: Long, replyTo: ActorRef[List[RGB_Set]]) extends ManagerCommand
 
   case class State(
                     activeCollector: Option[ActorRef[SetCollector.Command]],
