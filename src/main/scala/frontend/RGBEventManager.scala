@@ -8,6 +8,7 @@ import akka.stream.scaladsl.{Keep, Sink, Source, SourceQueueWithComplete}
 import akka.util.Timeout
 import backend.SetCollector
 import backend.SetCollector.RGB_Set
+import frontend.api.domain.StatusProtocol
 import org.slf4j.Logger
 
 import java.time.Instant
@@ -87,6 +88,17 @@ object RGBEventManager {
           case Failure(exception) => q.replyTo ! List.empty
         }
         Behaviors.same
+      case s: GetStatus =>
+        implicit val sys = context.system
+        implicit val ec = context.executionContext
+        val statusList: Seq[Future[StatusProtocol.Status]] = state.agedCollectors.map(a => a._3.ask(SetCollector.GetStatus(_))).toList
+        val status: Future[StatusProtocol.Status] = state.activeCollector.get.ask(SetCollector.GetStatus(_))
+        val f: Future[StatusProtocol.Stat] = Future.sequence(statusList :+ status).map(StatusProtocol.Stat(_))
+        f.onComplete {
+          case Success(value) => s.replyTo ! value
+          case Failure(exception) => s.replyTo ! StatusProtocol.Stat(Seq.empty)
+        }
+        Behaviors.same
     }
   }
 
@@ -131,7 +143,7 @@ object RGBEventManager {
 
   case class GetManagerState(replyTo: ActorRef[State]) extends ManagerCommand
 
-  case class GetStatus(replyTo: ActorRef[State]) extends ManagerCommand
+  case class GetStatus(replyTo: ActorRef[StatusProtocol.Stat]) extends ManagerCommand
 
   final case class Query(start: Long, end: Long, replyTo: ActorRef[List[RGB_Set]]) extends ManagerCommand
 

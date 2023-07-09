@@ -3,6 +3,7 @@ package backend
 import akka.actor.typed.scaladsl.{ActorContext, Behaviors}
 import akka.actor.typed.{ActorRef, Behavior}
 import frontend.RGBEventManager
+import frontend.api.domain.StatusProtocol
 import org.slf4j.Logger
 
 import java.time.Instant
@@ -74,6 +75,10 @@ object SetCollector {
           q.replyTo ! List.empty[RGB_Set]
         }
         Behaviors.same
+      case s: GetStatus =>
+        s.replyTo ! StatusProtocol.Status(state.validSets, state.outOfOrderMessages.size, state.list.size)
+        Behaviors.same
+
     }
   }
 
@@ -115,6 +120,9 @@ object SetCollector {
         } else {
           q.replyTo ! List.empty[RGB_Set]
         }
+        Behaviors.same
+      case s: GetStatus =>
+        s.replyTo ! StatusProtocol.Status(state.validSets, state.outOfOrderMessages.size, state.list.size)
         Behaviors.same
     }
   }
@@ -235,6 +243,8 @@ object SetCollector {
   final case class BatchedCommand(seq: Seq[Command], replyTo: ActorRef[RGBEventManager.ManagerCommand]) extends Command
 
   final case class GetState(replyTo: ActorRef[State]) extends Command
+
+  final case class GetStatus(replyTo: ActorRef[StatusProtocol.Status]) extends Command
 
   final case class Query(start: Long, end: Long, replyTo: ActorRef[List[RGB_Set]]) extends Command
 

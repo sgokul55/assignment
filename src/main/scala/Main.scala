@@ -3,6 +3,7 @@ import akka.actor.typed.scaladsl.Behaviors
 import akka.actor.typed.{ActorSystem, Behavior, Terminated}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.server.Route
+import frontend.api.AggregationRoutes
 import frontend.{KafkaConsumer, RGBEventManager}
 
 import scala.util.{Failure, Success}
@@ -17,8 +18,8 @@ object Main {
       implicit val system = context.system
       val manager = context.spawn(RGBEventManager.apply(), "event-manager")
       val kafkaConsumer = new KafkaConsumer(manager)
-      //      val routes = new AggregationRoutes(manager)
-      //      startHttpServer(routes.triggerRoutes)(context.system)
+      val routes = new AggregationRoutes(manager)
+      startHttpServer(routes.routes)(context.system)
       Behaviors.receiveSignal { case (_, Terminated(_)) =>
         context.log.error("------- Executor Actor stopped! --------")
         Behaviors.stopped

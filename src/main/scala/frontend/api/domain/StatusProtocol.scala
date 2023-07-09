@@ -15,6 +15,6 @@ object StatusProtocol {
   case class SetsResponse(sets: List[SetCollector.RGB_Set])
   case class Status(validSetCount: Int, outOfOrderMessagesCount: Int, setSize: Int)
 
-  case class Stat(data: List[Status])
+  case class Stat(data: Seq[Status])
 
 }

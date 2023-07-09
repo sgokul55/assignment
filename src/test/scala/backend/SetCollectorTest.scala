@@ -4,6 +4,7 @@ import akka.actor.testkit.typed.scaladsl.ActorTestKit
 import backend.SetCollector._
 import com.typesafe.config.ConfigFactory
 import frontend.RGBEventManager
+import frontend.api.domain.StatusProtocol
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
@@ -186,6 +187,28 @@ class SetCollectorTest extends AnyWordSpec
       actor ! SetCollector.Query(epoch + 5000, epoch + 6000, probe.ref)
       val res: Seq[RGB_Set] = probe.receiveMessage(10.seconds)
       assert(res.size == 94)
+    }
+  }
+
+  "Given Status request" must {
+    val actor = testKit.spawn(SetCollector(), "rgbCollector-6")
+    val epoch = Instant.now().toEpochMilli
+    val reply = testKit.createTestProbe[RGBEventManager.ManagerCommand]()
+    val probe = testKit.createTestProbe[StatusProtocol.Status]()
+    "return current status of the actor" in {
+      val redBatch = (1 to 100).map { i => Red(s"red-$i", epoch + i) }
+      val greenBatch = (1 to 100).map { i => Green(s"green-$i", epoch + i + 1) }
+      val blueBatch = (1 to 100).map { i => Blue(s"blue-$i", epoch + i + 2) }
+
+      actor ! SetCollector.BatchedCommand(redBatch, reply.ref)
+      actor ! SetCollector.BatchedCommand(greenBatch, reply.ref)
+      actor ! SetCollector.BatchedCommand(blueBatch, reply.ref)
+
+      actor ! SetCollector.GetStatus(probe.ref)
+      val status = probe.receiveMessage()
+      assert(status.setSize == 100)
+      assert(status.validSetCount == 100)
+      assert(status.outOfOrderMessagesCount == 0)
     }
   }
 
