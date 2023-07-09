@@ -105,13 +105,13 @@ class RGBEventManagerTest extends AnyWordSpec
       // 2:15 to 2:45 ->should only query oldActor2, currentActor
       manager ! RGBEventManager.Query(1672539300000L, 1672541100000L, resultProbe.ref)
       oldActor1.expectNoMessage()
-      oldActor2.expectMessage(SetCollector.Query(1672539300000L, 1672541100000L, resultProbe.ref))
-      currentActor.expectMessage(SetCollector.Query(1672539300000L, 1672541100000L, resultProbe.ref))
+      oldActor2.expectMessageType[SetCollector.Query]
+      currentActor.expectMessageType[SetCollector.Query]
       // 1:15 to 2:30 ->should query oldActor1 oldActor2, currentActor
       manager ! RGBEventManager.Query(1672535700000L, 1672540200000L, resultProbe.ref)
-      oldActor1.expectMessage(SetCollector.Query(1672535700000L, 1672540200000L, resultProbe.ref))
-      oldActor2.expectMessage(SetCollector.Query(1672535700000L, 1672540200000L, resultProbe.ref))
-      currentActor.expectMessage(SetCollector.Query(1672535700000L, 1672540200000L, resultProbe.ref))
+      oldActor1.expectMessageType[SetCollector.Query]
+      oldActor2.expectMessageType[SetCollector.Query]
+      currentActor.expectMessageType[SetCollector.Query]
     }
 
   }

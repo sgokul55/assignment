@@ -1,9 +1,11 @@
 package frontend
 
+import akka.actor.typed.scaladsl.AskPattern._
 import akka.actor.typed.scaladsl.{ActorContext, Behaviors}
 import akka.actor.typed.{ActorRef, ActorSystem, Behavior}
 import akka.stream.OverflowStrategy
 import akka.stream.scaladsl.{Keep, Sink, Source, SourceQueueWithComplete}
+import akka.util.Timeout
 import backend.SetCollector
 import backend.SetCollector.RGB_Set
 import org.slf4j.Logger
@@ -11,7 +13,7 @@ import org.slf4j.Logger
 import java.time.Instant
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.{ExecutionContext, Future}
-import scala.util.Random
+import scala.util.{Failure, Random, Success}
 
 /**
  *
@@ -26,6 +28,8 @@ import scala.util.Random
 object RGBEventManager {
 
   val QueueSize = 10000
+
+  implicit val timeout: Timeout = 5.seconds
 
   def apply(state: Option[State] = None): Behavior[ManagerCommand] = Behaviors.setup { context =>
     implicit val log: Logger = context.log
@@ -73,9 +77,15 @@ object RGBEventManager {
         Behaviors.same
       case q: Query =>
         // sent the query matching old and current active actors.
+        implicit val sys = context.system
+        implicit val ec = context.executionContext
         val filtered = state.agedCollectors.filter(a => Instant.ofEpochMilli(q.start).isBefore(a._2))
-        filtered.foreach(a => a._3 ! SetCollector.Query(q.start, q.end, q.replyTo))
-        state.activeCollector.foreach(a => a ! SetCollector.Query(q.start, q.end, q.replyTo))
+        val results: Seq[Future[List[RGB_Set]]] = filtered.map(a => a._3.ask(SetCollector.Query(q.start, q.end, _)))
+        val s: Future[List[RGB_Set]] = state.activeCollector.get.ask(SetCollector.Query(q.start, q.end, _))
+        Future.sequence(results :+ s).map(_.flatten).onComplete {
+          case Success(value) => q.replyTo ! value.toList
+          case Failure(exception) => q.replyTo ! List.empty
+        }
         Behaviors.same
     }
   }
@@ -120,6 +130,8 @@ object RGBEventManager {
   case class ReturnUnprocessed(list: Seq[SetCollector.Command]) extends ManagerCommand
 
   case class GetManagerState(replyTo: ActorRef[State]) extends ManagerCommand
+
+  case class GetStatus(replyTo: ActorRef[State]) extends ManagerCommand
 
   final case class Query(start: Long, end: Long, replyTo: ActorRef[List[RGB_Set]]) extends ManagerCommand
 
