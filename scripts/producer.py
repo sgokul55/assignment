@@ -5,25 +5,28 @@ from confluent_kafka import Producer
 conf = {'bootstrap.servers': "localhost:9092", 'client.id': socket.gethostname()}
 producer = Producer(conf)
 e = ["R_", "G_", "B_"]
-max_nr_event_ingestion = 300000
+max_nr_event_ingestion = 3000000
 burst_count = 10000
 event_delay = 10
 
 def alternate_event_ingestion():
+    timestamp = int(time.time())
     for x in range(max_nr_event_ingestion):
-        producer.produce("events", key=str(time.time()), value=e[x % 3] + str(int(time.time()) + event_delay + (x % 3)))
+        timestamp += 10
+        producer.produce("events", key=str(time.time()), value=e[x % 3] + str(timestamp))
+        producer.flush()
 
 def bursty_event_ingestion():
     count = 0
     e_index = 0
     for x in range(max_nr_event_ingestion):
         if count < burst_count:
-            producer.produce("events", key=str(time.time()), value=e[e_index] + str(int(time.time()) + event_delay))
+            producer.produce("events", key=str(time.time()), value=e[e_index] + str(int(time.time()) + ((x % 3)* 10)))
+            producer.flush()
             count += 1
         else:
             count = 0
             e_index = (e_index + 1) % 3
-
 def out_of_order_ingestion():
     for x in range(max_nr_event_ingestion):
         r = value=e[0] + str(int(time.time()) + event_delay)
@@ -33,3 +36,6 @@ def out_of_order_ingestion():
         producer.produce("events", key=str(time.time()), value= b)
         producer.produce("events", key=str(time.time()), value= r)
         count += 1
+
+if __name__ == "__main__":
+    bursty_event_ingestion()

@@ -10,6 +10,8 @@ object StatusProtocol {
   implicit val blueFormat = jsonFormat2(SetCollector.Blue)
   implicit val setCollectorFormat = jsonFormat3(SetCollector.RGB_Set)
   implicit val setRespFormat = jsonFormat1(SetsResponse)
+  implicit val StatusFormat = jsonFormat3(Status)
+  implicit val StatFormat = jsonFormat1(Stat)
 
 
   case class SetsResponse(sets: List[SetCollector.RGB_Set])

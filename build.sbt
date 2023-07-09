@@ -8,6 +8,8 @@ lazy val root = (project in file("."))
   .settings(
     name := "assignment",
     Test / parallelExecution := false,
+    Compile / mainClass := Some("Main"),
+    dockerBaseImage := "adoptopenjdk:11-jre-hotspot",
     libraryDependencies ++= Seq(
       "com.typesafe.akka" %% "akka-actor-typed" % AkkaVersion,
       "com.typesafe.akka" %% "akka-slf4j" % AkkaVersion,
@@ -22,4 +24,4 @@ lazy val root = (project in file("."))
       "org.scalatest" %% "scalatest" % "3.2.16" % Test,
       "com.typesafe.akka" %% "akka-stream-testkit" % AkkaVersion % Test,
     )
-  )
+  ).enablePlugins(JavaAppPackaging, DockerPlugin)

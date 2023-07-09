@@ -44,9 +44,29 @@ To run the app
 docker compose up -d
 ```
 
+To trigger the data ingetstion
+
+```sh
+python3 scripts/producer.py
+```
+
+To get the status if the sets collected 
+
+```sh
+curl --location 'http://localhost:8080/events/get-stats'
+```
+
 ## Benchmarks
 
-following are some benchmarks!!
+1. Ran with 3 million records, the aging policy kicks in as per config.
+2. there was no OOM - it handled the load well.
+
+![img_1.png](img_1.png)
+
+After 3M - the memory was around 1.2G and 3 actors. 2 of them are aged actors. If our limitation 1.5G. Then the max
+aged actor can be set to = 2. so it evicts 1 3rd of max memory everytime it reaches ~80% util. 
+
+![img_2.png](img_2.png)
 
 ## Future Work
 

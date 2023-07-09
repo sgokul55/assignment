@@ -19,5 +19,19 @@ services:
       KAFKA_LISTENERS: INSIDE://0.0.0.0:9093,OUTSIDE://0.0.0.0:9092
       KAFKA_INTER_BROKER_LISTENER_NAME: INSIDE
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-#      KAFKA_ADVERTISED_HOST_NAME: kafka
-#      KAFKA_ADVERTISED_PORT: 9092
+  #      KAFKA_ADVERTISED_HOST_NAME: kafka
+  #      KAFKA_ADVERTISED_PORT: 9092
+#  conviva:
+#    image: sgokul55/set-collector
+#    container_name: set-collector
+#    ports:
+#      - "8080:8080"
+#    depends_on:
+#      - kafka
+#    environment:
+#      KAFKA_HOST: kafka:9092
+#    deploy:
+#      resources:
+#        limits:
+#          cpus: 4
+#          memory: 2G

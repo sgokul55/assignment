@@ -39,9 +39,9 @@ class AggregationRoutes(manager: ActorRef[RGBEventManager.ManagerCommand])(impli
       )
     }
 
-  def queryForSets(startTime: Long, endTime: Long): Future[SetsResponse] =
+  private def queryForSets(startTime: Long, endTime: Long): Future[SetsResponse] =
     manager
       .ask(RGBEventManager.Query(startTime, endTime, _)).map(SetsResponse)
 
-  def getStatus(): Future[String] = ???
+  private def getStatus(): Future[Stat] = manager.ask(RGBEventManager.GetStatus)
 }

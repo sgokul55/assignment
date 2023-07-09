@@ -117,11 +117,11 @@ object RGBEventManager {
           SetCollector.Blue("blue", epoch)
         }
       }
-      .groupedWithin(100, 20.milli)
+      .groupedWithin(5000, 20.milli)
       .async
       .mergeSubstreams
       .async
-      .mapAsync(5) { requests: Seq[SetCollector.Command] =>
+      .mapAsync(1) { requests: Seq[SetCollector.Command] =>
         Future {
           actorRef ! MicroBatchedEvents(requests)
         }

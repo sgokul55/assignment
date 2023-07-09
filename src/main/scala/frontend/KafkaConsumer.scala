@@ -26,7 +26,7 @@ class KafkaConsumer(manager: ActorRef[RGBEventManager.ManagerCommand])(implicit 
   val control: DrainingControl[Done] =
     Consumer
       .committableSource(consumerSettings, Subscriptions.topics(topic))
-      .groupedWithin(1000, 3.seconds)
+      .groupedWithin(10000, 3.seconds)
       .mapAsync(1) { msg =>
         sort(msg).map { i =>
           i.foreach(e => manager ! RGBEventManager.InputEvent(e))
